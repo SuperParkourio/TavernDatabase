@@ -1,2 +1,2 @@
 # TavernDatabase
-Homework #1-2 for Miles Technologies Software Development Boot Camp
+Homework #1-3 for Miles Technologies Software Development Boot Camp
