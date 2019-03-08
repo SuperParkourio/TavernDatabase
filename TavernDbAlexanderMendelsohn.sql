@@ -1,12 +1,10 @@
 use AMendelsohn_2019;
---drop database if exists TavernDbAlexanderMendelsohn;
---create database TavernDbAlexanderMendelsohn;
---go
---use TavernDbAlexanderMendelsohn;
 go
 
 drop table if exists GuestStatus;
 drop table if exists Guest;
+drop table if exists Class;
+drop table if exists ClassType;
 drop table if exists Sales;
 drop table if exists ServiceStatus;
 drop table if exists Service;
@@ -15,6 +13,7 @@ drop table if exists Inventory;
 drop table if exists Supply;
 --drop table if exists Rat;
 drop table if exists Tavern;
+drop table if exists Location;
 drop table if exists TavernUser;
 drop table if exists Role;
 go
@@ -31,10 +30,15 @@ create table TavernUser (
 	roleId int foreign key references Role(id)
 );
 
+create table Location (
+	id int identity primary key,
+	name varchar(100) not null,
+);
+
 create table Tavern (
 	id int identity primary key,
 	name varchar(50) not null,
-	location varchar(100) not null,
+	locationId int foreign key references Location(id),
 	userId int foreign key references TavernUser(id),
 	numFloors int not null
 );
@@ -88,6 +92,37 @@ create table Sales (
 	amountPurchased int not null,
 	tavernId int foreign key references Tavern(id)
 );
+
+create table ClassType (
+	id int identity primary key,
+	name varchar(50) not null
+);
+
+create table Class (
+	id int identity primary key,
+	classTypeId int foreign key references ClassType(id),
+	level int not null
+);
+
+create table Guest (
+	id int identity,
+	name varchar(50) not null,
+	notes varchar(200),
+	birthday date not null,
+	cakeday date,
+	classId int foreign key references Class(id),
+	tavernId int
+);
+alter table Guest add primary key (id);
+alter table Guest add foreign key (tavernId) references Tavern(id);
+
+create table GuestStatus (
+	id int identity,
+	name varchar(50) not null,
+	guestId int
+);
+alter table GuestStatus add primary key (id);
+alter table GuestStatus add foreign key (guestId) references Guest(id);
 go
 
 insert into Role values ('Critic', 'Critiques the tavern');
@@ -104,11 +139,14 @@ insert into TavernUser values ('Bugs Bunny', 4);
 insert into TavernUser values ('Plankton', 2);
 select * from TavernUser;
 
-insert into Tavern values ('Chum Bucket', 'Bikini Bottom', 5, 2);
-insert into Tavern values ('Krusty Krab', 'Bikini Bottom', 5, 1);
-insert into Tavern values ('Wall-E Shelter', 'Landfill', 3, 1);
-insert into Tavern values ('House of Critics', 'Somewhere', 2, 2);
-insert into Tavern values ('House of Mouse', 'Kingdom Hearts', 1, 3);
+insert into Location values ('Bikini Bottom'), ('Landfill'), ('Somewhere'), ('Kingdom Hearts'), ('Las Vegas');
+select * from Location;
+
+insert into Tavern values ('Chum Bucket', 1, 5, 2);
+insert into Tavern values ('Krusty Krab', 1, 5, 1);
+insert into Tavern values ('Wall-E Shelter', 2, 3, 1);
+insert into Tavern values ('House of Critics', 3, 2, 2);
+insert into Tavern values ('House of Mouse', 4, 1, 3);
 select * from Tavern;
 
 --insert into Rat values ('Alex', 1);
@@ -159,35 +197,18 @@ insert into Sales values (1, 'Charlie', 9.00, '2019-02-03', 3, 3);
 insert into Sales values (1, 'Daniel', 19.00, '2019-02-04', 2, 4);
 insert into Sales values (1, 'Eli', 21.00, '2019-02-05', 1, 5);
 select * from Sales;
-go
 
-create table Guest (
-	id int identity,
-	name varchar(50) not null,
-	notes varchar(200),
-	birthday date not null,
-	cakeday date,
-	class varchar(50) not null,
-	level int not null,
-	tavernId int
-);
-alter table Guest add primary key (id);
-alter table Guest add foreign key (tavernId) references Tavern(id);
+insert into ClassType values ('Bard'), ('Fighter'), ('Monk'), ('Wizard'), ('Sage');
+select * from ClassType;
 
-create table GuestStatus (
-	id int identity,
-	name varchar(50) not null,
-	guestId int
-);
-alter table GuestStatus add primary key (id);
-alter table GuestStatus add foreign key (guestId) references Guest(id);
-go
+insert into Class values (1, 99), (2, 98), (3, 97), (4, 96), (5, 95);
+select * from Class;
 
-insert into Guest values ('Neil Patrick Harry', 'Plays Count Dracula', '1987-01-31', null, 'Bard', 99, 1);
-insert into Guest values ('Tom Crews', 'Is his own stunt double for sailing', '1987-02-01', '1987-02-01', 'Fighter', 98, 2);
-insert into Guest values ('Leonardo DiCappy', 'Is a sentient cap that possesses actors', '1987-02-02', null, 'Monk', 97, 3);
-insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '1987-02-06', 'Wizard', 96, 4);
-insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 'Sage', 95, 5);
+insert into Guest values ('Neil Patrick Harry', 'Plays Count Dracula', '1987-01-31', null, 1, 1);
+insert into Guest values ('Tom Crews', 'Is his own stunt double for sailing', '1987-02-01', '1987-02-01', 2, 2);
+insert into Guest values ('Leonardo DiCappy', 'Is a sentient cap that possesses actors', '1987-02-02', null, 3, 3);
+insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '1987-02-06', 4, 4);
+insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 5, 5);
 select * from Guest;
 
 insert into GuestStatus values ('Hangry', 1);
