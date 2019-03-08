@@ -1,11 +1,14 @@
 use AMendelsohn_2019;
 go
 
+drop table if exists RoomStay;
+drop table if exists RoomStatus;
+drop table if exists Room;
 drop table if exists GuestStatus;
 drop table if exists Guest;
 drop table if exists Class;
 drop table if exists ClassType;
-drop table if exists Sales;
+drop table if exists ServiceSale;
 drop table if exists ServiceStatus;
 drop table if exists Service;
 drop table if exists Receipt;
@@ -83,7 +86,7 @@ create table ServiceStatus (
 	serviceId int foreign key references Service(id)
 );
 
-create table Sales (
+create table ServiceSale (
 	id int identity primary key,
 	serviceId int foreign key references Service(id),
 	guest varchar(50) not null,
@@ -105,7 +108,7 @@ create table Class (
 );
 
 create table Guest (
-	id int identity,
+	id int identity primary key,
 	name varchar(50) not null,
 	notes varchar(200),
 	birthday date not null,
@@ -113,7 +116,6 @@ create table Guest (
 	classId int foreign key references Class(id),
 	tavernId int
 );
-alter table Guest add primary key (id);
 alter table Guest add foreign key (tavernId) references Tavern(id);
 
 create table GuestStatus (
@@ -123,6 +125,26 @@ create table GuestStatus (
 );
 alter table GuestStatus add primary key (id);
 alter table GuestStatus add foreign key (guestId) references Guest(id);
+
+create table Room (
+	id int identity primary key,
+	tavernId int foreign key references Tavern(id)
+);
+
+create table RoomStatus (
+	id int identity primary key,
+	name varchar(50) not null,
+	roomId int foreign key references Room(id)
+);
+
+create table RoomStay (
+	id int identity primary key,
+	serviceSaleId int foreign key references ServiceSale(id),
+	guestId int foreign key references Guest(id),
+	roomId int foreign key references Room(id),
+	dateStayedIn date default GETDATE(),
+	rate money not null
+);
 go
 
 insert into Role values ('Critic', 'Critiques the tavern');
@@ -191,12 +213,12 @@ insert into ServiceStatus values ('Inactive', 4);
 insert into ServiceStatus values ('Active', 5);
 select * from ServiceStatus;
 
-insert into Sales values (1, 'Alice', 2.00, '2019-02-01', 5, 1);
-insert into Sales values (1, 'Buford', 5.00, '2019-02-02', 4, 2);
-insert into Sales values (1, 'Charlie', 9.00, '2019-02-03', 3, 3);
-insert into Sales values (1, 'Daniel', 19.00, '2019-02-04', 2, 4);
-insert into Sales values (1, 'Eli', 21.00, '2019-02-05', 1, 5);
-select * from Sales;
+insert into ServiceSale values (1, 'Alice', 2.00, '2019-02-01', 5, 1);
+insert into ServiceSale values (1, 'Buford', 5.00, '2019-02-02', 4, 2);
+insert into ServiceSale values (1, 'Charlie', 9.00, '2019-02-03', 3, 3);
+insert into ServiceSale values (1, 'Daniel', 19.00, '2019-02-04', 2, 4);
+insert into ServiceSale values (1, 'Eli', 21.00, '2019-02-05', 1, 5);
+select * from ServiceSale;
 
 insert into ClassType values ('Bard'), ('Fighter'), ('Monk'), ('Wizard'), ('Sage');
 select * from ClassType;
@@ -217,4 +239,35 @@ insert into GuestStatus values ('Fine', 3);
 insert into GuestStatus values ('Placid', 4);
 insert into GuestStatus values ('Raging', 5);
 select * from GuestStatus;
+
+insert into Room values (1), (2), (3), (4), (5);
+select * from Room;
+
+insert into RoomStatus values ('Available', 1), ('No windows', 1), ('Available', 2), ('Available', 3), ('Available', 4), ('Available', 5);
+select * from RoomStatus;
+
+insert into RoomStay values (1, 1, 1, '2019-02-01', 5.00), (2, 2, 2, '2019-02-02', 5.00), (3, 3, 3, '2019-02-03', 5.00),
+	(4, 4, 4, '2019-02-04', 5.00), (5, 5, 5, '2019-02-05', 5.00);
+select * from RoomStay;
+go
+
+select name, birthday from Guest where YEAR(birthday) < 2000;
+select Room.id, tavernId, serviceSaleId, guestId, dateStayedIn, rate
+	from Room inner join RoomStay on Room.id = RoomStay.roomId where rate > 1.00; -- I'm treating $1.00 as 100 gold
+select distinct name from Guest;
+select * from Guest order by name asc;
+select top 10 * from ServiceSale order by price desc;
+select distinct TABLE_NAME from INFORMATION_SCHEMA.TABLES;
+select g.name, ct.name as [className], c.level,
+	(case when c.level <= 10 then '1-10' when c.level <= 20 then '11-20' when c.level <= 30 then '21-30' when c.level <= 40 then '31-40' when c.level <= 50 then '41-50'
+		when c.level <= 60 then '51-60' when c.level <= 70 then '61-70' when c.level <= 80 then '71-80' when c.level <= 90 then '81-90' else '91-99' end) as [grouping]
+	from Guest g inner join Class c on (g.classId = c.id) inner join ClassType ct on (c.classTypeId = ct.id);
+drop table if exists DummyStatus;
+create table DummyStatus (
+	id int identity primary key,
+	name varchar(50) not null,
+	holderId int not null,
+);
+insert into DummyStatus select name, roomId from RoomStatus;
+select * from DummyStatus;
 go

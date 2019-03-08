@@ -1,3 +1,6 @@
+use AMendelsohn_2019;
+go
+
 drop table if exists LabCreateTable;
 create table LabCreateTable (
 	id int identity,
