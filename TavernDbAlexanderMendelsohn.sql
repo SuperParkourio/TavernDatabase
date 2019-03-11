@@ -5,6 +5,7 @@ drop table if exists RoomStay;
 drop table if exists RoomStatus;
 drop table if exists Room;
 drop table if exists GuestStatus;
+drop table if exists GuestLinkClass;
 drop table if exists Guest;
 drop table if exists Class;
 drop table if exists ClassType;
@@ -113,10 +114,15 @@ create table Guest (
 	notes varchar(200),
 	birthday date not null,
 	cakeday date,
-	classId int foreign key references Class(id),
+	--classId int foreign key references Class(id),
 	tavernId int
 );
 alter table Guest add foreign key (tavernId) references Tavern(id);
+
+create table GuestLinkClass (
+	guestId int foreign key references Guest(id),
+	classId int foreign key references Class(id)
+);
 
 create table GuestStatus (
 	id int identity,
@@ -226,12 +232,15 @@ select * from ClassType;
 insert into Class values (1, 99), (2, 98), (3, 97), (4, 96), (5, 95);
 select * from Class;
 
-insert into Guest values ('Neil Patrick Harry', 'Plays Count Dracula', '1987-01-31', null, 1, 1);
-insert into Guest values ('Tom Crews', 'Is his own stunt double for sailing', '1987-02-01', '1987-02-01', 2, 2);
-insert into Guest values ('Leonardo DiCappy', 'Is a sentient cap that possesses actors', '1987-02-02', null, 3, 3);
-insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '1987-02-06', 4, 4);
-insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 5, 5);
+insert into Guest values ('Neil Patrick Harry', 'Plays Count Dracula', '1987-01-31', null, 1);
+insert into Guest values ('Tom Crews', 'Is his own stunt double for sailing', '1987-02-01', '1987-02-01', 2);
+insert into Guest values ('Leonardo DiCappy', 'Is a sentient cap that possesses actors', '1987-02-02', null, 3);
+insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '1987-02-06', 4);
+insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 5);
 select * from Guest;
+
+insert into GuestLinkClass values (1, 1), (2, 2), (3, 3), (4, 4), (5, 5);
+select * from GuestLinkClass;
 
 insert into GuestStatus values ('Hangry', 1);
 insert into GuestStatus values ('Happy', 2);
@@ -261,7 +270,7 @@ select distinct TABLE_NAME from INFORMATION_SCHEMA.TABLES;
 select g.name, ct.name as [className], c.level,
 	(case when c.level <= 10 then '1-10' when c.level <= 20 then '11-20' when c.level <= 30 then '21-30' when c.level <= 40 then '31-40' when c.level <= 50 then '41-50'
 		when c.level <= 60 then '51-60' when c.level <= 70 then '61-70' when c.level <= 80 then '71-80' when c.level <= 90 then '81-90' else '91-99' end) as [grouping]
-	from Guest g inner join Class c on (g.classId = c.id) inner join ClassType ct on (c.classTypeId = ct.id);
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id) inner join ClassType ct on (c.classTypeId = ct.id);
 drop table if exists DummyStatus;
 create table DummyStatus (
 	id int identity primary key,
