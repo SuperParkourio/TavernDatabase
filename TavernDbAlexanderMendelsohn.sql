@@ -149,12 +149,13 @@ create table RoomStay (
 	guestId int foreign key references Guest(id),
 	roomId int foreign key references Room(id),
 	dateStayedIn date default GETDATE(),
+	dateCheckedOut date default GETDATE(),
 	rate money not null
 );
 go
 
 insert into Role values ('Critic', 'Critiques the tavern');
-insert into Role values ('Manager', 'Manages the tavern');
+insert into Role values ('Admin', 'Manages the tavern');
 insert into Role values ('Cleaner', 'Cleans the tavern');
 insert into Role values ('Bard', 'Entertains the guests');
 insert into Role values ('Theologist', 'Wait, what?');
@@ -220,16 +221,16 @@ insert into ServiceStatus values ('Active', 5);
 select * from ServiceStatus;
 
 insert into ServiceSale values (1, 'Alice', 2.00, '2019-02-01', 5, 1);
-insert into ServiceSale values (1, 'Buford', 5.00, '2019-02-02', 4, 2);
-insert into ServiceSale values (1, 'Charlie', 9.00, '2019-02-03', 3, 3);
-insert into ServiceSale values (1, 'Daniel', 19.00, '2019-02-04', 2, 4);
-insert into ServiceSale values (1, 'Eli', 21.00, '2019-02-05', 1, 5);
+insert into ServiceSale values (2, 'Buford', 5.00, '2019-02-02', 4, 2);
+insert into ServiceSale values (3, 'Charlie', 9.00, '2019-02-03', 3, 3);
+insert into ServiceSale values (4, 'Daniel', 19.00, '2019-02-04', 2, 4);
+insert into ServiceSale values (5, 'Eli', 21.00, '2019-02-05', 1, 5);
 select * from ServiceSale;
 
 insert into ClassType values ('Bard'), ('Fighter'), ('Monk'), ('Wizard'), ('Sage');
 select * from ClassType;
 
-insert into Class values (1, 99), (2, 98), (3, 97), (4, 96), (5, 95);
+insert into Class values (1, 99), (2, 98), (3, 97), (4, 96), (5, 95), (3, 89);
 select * from Class;
 
 insert into Guest values ('Neil Patrick Harry', 'Plays Count Dracula', '1987-01-31', null, 1);
@@ -239,7 +240,7 @@ insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '19
 insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 5);
 select * from Guest;
 
-insert into GuestLinkClass values (1, 1), (2, 2), (3, 3), (4, 4), (5, 5);
+insert into GuestLinkClass values (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (1, 6);
 select * from GuestLinkClass;
 
 insert into GuestStatus values ('Hangry', 1);
@@ -255,8 +256,8 @@ select * from Room;
 insert into RoomStatus values ('Available', 1), ('No windows', 1), ('Available', 2), ('Available', 3), ('Available', 4), ('Available', 5);
 select * from RoomStatus;
 
-insert into RoomStay values (1, 1, 1, '2019-02-01', 5.00), (2, 2, 2, '2019-02-02', 5.00), (3, 3, 3, '2019-02-03', 5.00),
-	(4, 4, 4, '2019-02-04', 5.00), (5, 5, 5, '2019-02-05', 5.00);
+insert into RoomStay values (1, 1, 1, '2019-02-01', '2019-02-02', 5.00), (2, 2, 2, '2019-02-02', '2019-02-03', 5.00), (3, 3, 3, '2019-02-03', '2019-02-04', 5.00),
+	(4, 4, 4, '2019-02-04', '2019-02-05', 5.00), (5, 5, 5, '2019-02-05', '2019-02-06', 5.00);
 select * from RoomStay;
 go
 
@@ -279,4 +280,31 @@ create table DummyStatus (
 );
 insert into DummyStatus select name, roomId from RoomStatus;
 select * from DummyStatus;
+go
+
+select tu.name, r.name as [role] from TavernUser tu inner join Role r on (tu.roleId = r.id) where r.name = 'Admin';
+select tu.name as [username], r.name as [role], t.name as [tavernname], l.name as [locationName]
+	from TavernUser tu inner join Role r on (tu.roleId = r.id) inner join Tavern t on (t.userId = tu.id) inner join Location l on (t.locationId = l.id)
+	where r.name = 'Admin';
+select g.name, c.level
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id)
+	order by g.name asc;
+select top 10 s.name, ss.price from ServiceSale ss inner join Service s on (ss.serviceId = s.id) order by ss.price;
+select g.name, count(distinct c.id) as [numClasses]
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id)
+	group by g.name
+	having count(distinct c.id) >= 2;
+select g.name, count(distinct c.id) as [numClasses]
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id and c.level > 5)
+	group by g.name
+	having count(distinct c.id) >= 2;
+select g.name, ct.name as [class], max(c.level) as [level]
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id) inner join ClassType ct on (ct.id = c.classTypeId)
+	group by g.name, ct.name;
+declare @startdate date;
+select @startdate = '2019-02-03';
+declare @enddate date;
+select @enddate = '2019-02-05';
+select g.name, rs.dateStayedIn, rs.dateCheckedOut from Guest g inner join RoomStay rs on (g.id = rs.guestId)
+	where DATEDIFF(day, @enddate, rs.dateStayedIn) <= 0 and DATEDIFF(day, rs.dateCheckedOut, @startdate) <= 0;
 go
