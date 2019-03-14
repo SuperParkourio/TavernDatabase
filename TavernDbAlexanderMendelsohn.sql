@@ -273,6 +273,7 @@ select g.name, ct.name as [className], c.level,
 		when c.level <= 60 then '51-60' when c.level <= 70 then '61-70' when c.level <= 80 then '71-80' when c.level <= 90 then '81-90' else '91-99' end) as [grouping]
 	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id) inner join ClassType ct on (c.classTypeId = ct.id);
 drop table if exists DummyStatus;
+go
 create table DummyStatus (
 	id int identity primary key,
 	name varchar(50) not null,
