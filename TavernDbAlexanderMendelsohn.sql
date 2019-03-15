@@ -25,7 +25,7 @@ go
 create table Role (
 	id int identity primary key,
 	name varchar(50) not null,
-	role varchar(200) not null
+	description varchar(200) not null
 );
 
 create table TavernUser (
@@ -261,6 +261,7 @@ insert into RoomStay values (1, 1, 1, '2019-02-01', '2019-02-02', 5.00), (2, 2, 
 select * from RoomStay;
 go
 
+--Homework 3 Queries
 select name, birthday from Guest where YEAR(birthday) < 2000;
 select Room.id, tavernId, serviceSaleId, guestId, dateStayedIn, rate
 	from Room inner join RoomStay on Room.id = RoomStay.roomId where rate > 1.00; -- I'm treating $1.00 as 100 gold
@@ -283,6 +284,7 @@ insert into DummyStatus select name, roomId from RoomStatus;
 select * from DummyStatus;
 go
 
+--Homework 4 Queries
 select tu.name, r.name as [role] from TavernUser tu inner join Role r on (tu.roleId = r.id) where r.name = 'Admin';
 select tu.name as [username], r.name as [role], t.name as [tavernname], l.name as [locationName]
 	from TavernUser tu inner join Role r on (tu.roleId = r.id) inner join Tavern t on (t.userId = tu.id) inner join Location l on (t.locationId = l.id)
@@ -299,13 +301,63 @@ select g.name, count(distinct c.id) as [numClasses]
 	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id and c.level > 5)
 	group by g.name
 	having count(distinct c.id) >= 2;
-select g.name, ct.name as [class], max(c.level) as [level]
+select g.name, ct.name as [class], c.level
 	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id) inner join ClassType ct on (ct.id = c.classTypeId)
-	group by g.name, ct.name;
+		inner join
+		(select g2.id, max(c2.level) as maxLvl from Class c2 inner join GuestLinkClass glc2 on c2.id = glc2.classId inner join Guest g2 on glc2.guestId = g2.id group by g2.id)
+		gml on g.id = gml.id and gml.maxLvl = c.level;
 declare @startdate date;
 select @startdate = '2019-02-03';
 declare @enddate date;
 select @enddate = '2019-02-05';
 select g.name, rs.dateStayedIn, rs.dateCheckedOut from Guest g inner join RoomStay rs on (g.id = rs.guestId)
 	where DATEDIFF(day, @enddate, rs.dateStayedIn) <= 0 and DATEDIFF(day, rs.dateCheckedOut, @startdate) <= 0;
+go
+
+--Homework 5 Queries/Functions
+select tu.id, tu.name, r.name as [role], r.description from TavernUser tu inner join Role r on tu.roleId = r.id;
+select ct.name, count(distinct glc.guestId) as [guestCount]
+	from ClassType ct inner join Class c on ct.id = c.classTypeId inner join GuestLinkClass glc on c.id = glc.classId
+	group by ct.name;
+drop function if exists LevelGrouping;
+go
+create function LevelGrouping(@level int)
+returns varchar(15) as begin
+	return case when @level <= 5 then 'Beginner' when @level <= 10 then 'Intermediate' else 'Expert' end;
+end;
+go
+select g.name, ct.name as [class], c.level, dbo.LevelGrouping(c.level) as [rank]
+	from Guest g inner join GuestLinkClass glc on (g.id = glc.guestId) inner join Class c on (glc.classId = c.id) inner join ClassType ct on (ct.id = c.classTypeId)
+		inner join
+		(select g2.id, max(c2.level) as maxLvl from Class c2 inner join GuestLinkClass glc2 on c2.id = glc2.classId inner join Guest g2 on glc2.guestId = g2.id group by g2.id)
+		gml on g.id = gml.id and gml.maxLvl = c.level;
+drop function if exists ReportUnusedRooms;
+go
+create function ReportUnusedRooms(@day date)
+returns table as return
+	select r.id as [roomNumber], rs.dateStayedIn, rs.dateCheckedOut, t.name
+		from Room r inner join Tavern t on r.tavernId = t.id inner join RoomStay rs on r.id = rs.roomId
+		where not (DATEDIFF(day, @day, rs.dateStayedIn) <= 0 and DATEDIFF(day, rs.dateCheckedOut, @day) <= 0);
+go
+select * from dbo.ReportUnusedRooms('2019-02-02');
+drop function if exists ReportRoomsInPriceRange;
+go
+create function ReportRoomsInPriceRange(@priceLeftBound money, @priceRightBound money)
+returns table as return
+	select r.id as [roomNumber], rs.rate, t.name
+		from Room r inner join Tavern t on r.tavernId = t.id inner join RoomStay rs on r.id = rs.roomId
+		where @priceLeftBound <= rs.rate and rs.rate <= @priceRightBound;
+go
+select * from dbo.ReportRoomsInPriceRange(4.00, 6.00);
+select * from dbo.ReportRoomsInPriceRange(3.00, 4.00);
+insert into TavernUser(name, roleId) values ('RoboPlankton', 2);
+insert into Tavern(name, locationId, userId, numFloors) values ('Discount Chum Bucket', 1, SCOPE_IDENTITY(), 1);
+insert into Room(tavernId) values (SCOPE_IDENTITY());
+insert into RoomStay(serviceSaleId, guestId, roomId, dateStayedIn, dateCheckedOut, rate) values (1, 1, SCOPE_IDENTITY(), '2019-03-05', '2019-03-05',
+	(select top 1 rate from dbo.ReportRoomsInPriceRange(0, 10) order by rate asc) - 0.01
+);
+select * from TavernUser;
+select * from Tavern;
+select * from Room;
+select * from RoomStay;
 go
