@@ -105,3 +105,59 @@ end;
 go
 select s.name, ss.price, ss.amountPurchased, dbo.pricing(ss.id) as [totalPrice] from ServiceSale ss inner join Service s on (ss.serviceId = s.id);
 go
+
+drop procedure if exists SellSupplies;
+drop trigger if exists UpdateInventory;
+drop trigger if exists OrderMoreSupplies;
+go
+--"Order" more supplies to match previous supplyCount
+create trigger OrderMoreSupplies
+	on Inventory after update
+as begin
+	if((select count(*) from inserted) = 1 and (select supplyCount from inserted) = 0)
+	begin
+		declare @supplyId int;
+		declare @tavernId int;
+		declare @supplyCount int;
+		select @supplyId = supplyId, @tavernId = tavernId, @supplyCount = supplyCount from deleted;
+		update Inventory set supplyCount = @supplyCount, updateDate = GETDATE()
+			where supplyId = @supplyId and tavernId = @tavernId;
+	end;
+end;
+go
+--Update Inventory to match new record in Receipt
+create trigger UpdateInventory
+	on Receipt after insert
+as begin
+	declare @supplyId int;
+	declare @tavernId int;
+	declare @amountReceived int;
+	select @supplyId = supplyId, @tavernId = tavernId, @amountReceived = amountReceived from inserted;
+	update Inventory set supplyCount = supplyCount - @amountReceived, updateDate = GETDATE()
+		where supplyId = @supplyId and tavernId = @tavernId;
+end;
+go
+--Sell supplies as long as there are enough
+create procedure SellSupplies
+	@supplyId int,
+	@tavernId int,
+	@cost money,
+	@amountReceived int
+as begin
+	if not exists(select * from Inventory where supplyId = @supplyId and tavernId = @tavernId and supplyCount >= @amountReceived)
+	begin
+		print 'Not enough supplies!';
+		return;
+	end;
+	insert into Receipt values (@supplyId, @tavernId, @cost, @amountReceived, GETDATE());
+end;
+go
+select * from Inventory;
+select * from Receipt;
+exec SellSupplies 1, 1, 5.00, 1;
+select * from Inventory;
+select * from Receipt;
+exec SellSupplies 5, 5, 5.00, 1;
+select * from Inventory;
+select * from Receipt;
+go
