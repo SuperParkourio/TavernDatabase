@@ -6,16 +6,15 @@ drop table if exists RoomStatus;
 drop table if exists Room;
 drop table if exists GuestStatus;
 drop table if exists GuestLinkClass;
+drop table if exists ServiceSale;
 drop table if exists Guest;
 drop table if exists Class;
 drop table if exists ClassType;
-drop table if exists ServiceSale;
 drop table if exists ServiceStatus;
 drop table if exists Service;
 drop table if exists Receipt;
 drop table if exists Inventory;
 drop table if exists Supply;
---drop table if exists Rat;
 drop table if exists Tavern;
 drop table if exists Location;
 drop table if exists TavernUser;
@@ -46,12 +45,6 @@ create table Tavern (
 	userId int foreign key references TavernUser(id),
 	numFloors int not null
 );
-
---create table Rat (
---	id int identity primary key,
---	name varchar(50) not null,
---	tavernId int foreign key references Tavern(id)
---);
 
 create table Supply (
 	id int identity primary key,
@@ -87,16 +80,6 @@ create table ServiceStatus (
 	serviceId int foreign key references Service(id)
 );
 
-create table ServiceSale (
-	id int identity primary key,
-	serviceId int foreign key references Service(id),
-	guest varchar(50) not null,
-	price money not null,
-	purchaseDate date default(GETDATE()) not null,
-	amountPurchased int not null,
-	tavernId int foreign key references Tavern(id)
-);
-
 create table ClassType (
 	id int identity primary key,
 	name varchar(50) not null
@@ -114,10 +97,19 @@ create table Guest (
 	notes varchar(200),
 	birthday date not null,
 	cakeday date,
-	--classId int foreign key references Class(id),
 	tavernId int
 );
 alter table Guest add foreign key (tavernId) references Tavern(id);
+
+create table ServiceSale (
+	id int identity primary key,
+	serviceId int foreign key references Service(id),
+	guestId int foreign key references Guest(id),
+	price money not null,
+	purchaseDate date default(GETDATE()) not null,
+	amountPurchased int not null,
+	tavernId int foreign key references Tavern(id)
+);
 
 create table GuestLinkClass (
 	guestId int foreign key references Guest(id),
@@ -140,14 +132,14 @@ create table Room (
 create table RoomStatus (
 	id int identity primary key,
 	name varchar(50) not null,
-	roomId int foreign key references Room(id)
+	roomId int foreign key references Room(id) on delete cascade
 );
 
 create table RoomStay (
 	id int identity primary key,
 	serviceSaleId int foreign key references ServiceSale(id),
 	guestId int foreign key references Guest(id),
-	roomId int foreign key references Room(id),
+	roomId int foreign key references Room(id) on delete cascade,
 	dateStayedIn date default GETDATE(),
 	dateCheckedOut date default GETDATE(),
 	rate money not null
@@ -177,13 +169,6 @@ insert into Tavern values ('Wall-E Shelter', 2, 3, 1);
 insert into Tavern values ('House of Critics', 3, 2, 2);
 insert into Tavern values ('House of Mouse', 4, 1, 3);
 select * from Tavern;
-
---insert into Rat values ('Alex', 1);
---insert into Rat values ('Brian', 2);
---insert into Rat values ('Cathy', 3);
---insert into Rat values ('Diana', 5);
---insert into Rat values ('Eric', 5);
---select * from Rat;
 
 insert into Supply values ('Milk', 'Gallons');
 insert into Supply values ('Egg', null);
@@ -220,13 +205,6 @@ insert into ServiceStatus values ('Inactive', 4);
 insert into ServiceStatus values ('Active', 5);
 select * from ServiceStatus;
 
-insert into ServiceSale values (1, 'Alice', 2.00, '2019-02-01', 5, 1);
-insert into ServiceSale values (2, 'Buford', 5.00, '2019-02-02', 4, 2);
-insert into ServiceSale values (3, 'Charlie', 9.00, '2019-02-03', 3, 3);
-insert into ServiceSale values (4, 'Daniel', 19.00, '2019-02-04', 2, 4);
-insert into ServiceSale values (5, 'Eli', 21.00, '2019-02-05', 1, 5);
-select * from ServiceSale;
-
 insert into ClassType values ('Bard'), ('Fighter'), ('Monk'), ('Wizard'), ('Sage');
 select * from ClassType;
 
@@ -239,6 +217,13 @@ insert into Guest values ('Leonardo DiCappy', 'Is a sentient cap that possesses 
 insert into Guest values ('Justin Beaver', 'Sings about dams', '1987-02-03', '1987-02-06', 4);
 insert into Guest values ('Gandalf the Beige', 'Flies and is not a fool', '1987-02-04', null, 5);
 select * from Guest;
+
+insert into ServiceSale values (1, 1, 2.00, '2019-02-01', 5, 1);
+insert into ServiceSale values (2, 2, 5.00, '2019-02-02', 4, 2);
+insert into ServiceSale values (3, 3, 9.00, '2019-02-03', 3, 3);
+insert into ServiceSale values (4, 4, 19.00, '2019-02-04', 2, 4);
+insert into ServiceSale values (5, 5, 21.00, '2019-02-05', 1, 5);
+select * from ServiceSale;
 
 insert into GuestLinkClass values (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (1, 6);
 select * from GuestLinkClass;
@@ -335,7 +320,7 @@ drop function if exists ReportUnusedRooms;
 go
 create function ReportUnusedRooms(@day date)
 returns table as return
-	select r.id as [roomNumber], rs.dateStayedIn, rs.dateCheckedOut, t.name
+	select r.id as [roomNumber], rs.dateStayedIn, rs.dateCheckedOut, t.name, rs.rate
 		from Room r inner join Tavern t on r.tavernId = t.id inner join RoomStay rs on r.id = rs.roomId
 		where not (DATEDIFF(day, @day, rs.dateStayedIn) <= 0 and DATEDIFF(day, rs.dateCheckedOut, @day) <= 0);
 go
@@ -360,4 +345,114 @@ select * from TavernUser;
 select * from Tavern;
 select * from Room;
 select * from RoomStay;
+go
+
+--Homework 6
+drop procedure if exists GuestsWithClass;
+go
+create procedure GuestsWithClass
+	@className varchar(50)
+as begin
+	select g.name, ct.name as 'class'
+		from Guest g inner join GuestLinkClass glc on g.id = glc.guestId inner join Class c on glc.classId = c.id inner join ClassType ct on c.classTypeId = ct.id
+		where ct.name = @className;
+end;
+go
+drop procedure if exists TotalGuestSpentOnServices;
+go
+create procedure TotalGuestSpentOnServices
+	@guestId int,
+	@result money out
+as begin
+	select @result = sum(price * amountPurchased) from ServiceSale where guestId = @guestId;
+end;
+go
+drop procedure if exists GuestsOfLevel;
+go
+create procedure GuestsOfLevel
+	@level int,
+	@getLower int = 0
+as begin
+	select g.name, ct.name as 'class', c.level
+		from Guest g inner join GuestLinkClass glc on g.id = glc.guestId inner join Class c on glc.classId = c.id inner join ClassType ct on c.classTypeId = ct.id
+		where (@getLower = 0 and c.level >= @level) or (@getLower = 1 and c.level <= @level)
+		order by g.name, c.level desc;
+end;
+go
+drop procedure if exists DeleteTavernWithId;
+go
+create procedure DeleteTavernWithId
+	@tavernId int
+as begin
+	delete from Tavern where id = @tavernId;
+end;
+go
+drop trigger if exists DeleteRecordsReferencingTavernId;
+go
+create trigger DeleteRecordsReferencingTavernId
+	on Tavern instead of delete
+as begin
+	declare @tavernId int;
+	select @tavernId = id from deleted;
+	delete from Room where tavernId = @tavernId;
+	delete from ServiceSale where tavernId = @tavernId;
+	delete from Receipt where tavernId = @tavernId;
+	delete from Inventory where tavernId = @tavernId;
+	delete from Tavern where id = @tavernId;
+end;
+go
+drop procedure if exists BookCheapestRoom;
+go
+create procedure BookCheapestRoom
+	@serviceSaleId int,
+	@guestId int
+as begin
+	declare @desiredRoomNum int;
+	declare @desiredRate money;
+	select top 1 @desiredRoomNum = roomNumber, @desiredRate = rate from dbo.ReportUnusedRooms(GETDATE()) order by rate asc;
+	insert into RoomStay(serviceSaleId, guestId, roomId, dateStayedIn, dateCheckedOut, rate)
+		values (@serviceSaleId, @guestId, @desiredRoomNum, GETDATE(), GETDATE(), @desiredRate);
+end;
+go
+drop trigger if exists MakeCleaningServiceSaleForRoomStay;
+go
+create trigger MakeCleaningServiceSaleForRoomStay
+	on RoomStay instead of insert
+as begin
+	declare @serviceSaleId int;
+	select @serviceSaleId = serviceSaleId from inserted;
+	if not exists (select * from ServiceSale where id = @serviceSaleId)
+	begin
+		declare @tavernId int;
+		declare @guestId int;
+		select @tavernId = r.tavernId, @guestId = i.guestId
+			from inserted i inner join Room r on i.roomId = r.id;
+		declare @cleaningServiceId int;
+		select @cleaningServiceId = id from Service where name = 'Cleaning';
+		declare @cleaningServicePrice money;
+		select @cleaningServicePrice = price from ServiceSale where serviceId = @cleaningServiceId;
+		insert into ServiceSale (serviceId, guestId, price, purchaseDate, amountPurchased, tavernId)
+			values (@cleaningServiceId, @guestId, @cleaningServicePrice, GETDATE(), 1, @tavernId);
+	end;
+	insert into RoomStay select serviceSaleID, guestId, roomId, dateStayedIn, dateCheckedOut, rate from inserted;
+end;
+go
+exec GuestsWithClass 'Monk';
+declare @guestTotalSpendings money;
+exec TotalGuestSpentOnServices 1, @guestTotalSpendings out;
+select @guestTotalSpendings as 'spendings';
+exec GuestsOfLevel 97;
+exec GuestsOfLevel 97, 1;
+exec DeleteTavernWithId 6;
+select * from Tavern;
+select * from Inventory;
+select * from Receipt;
+select * from ServiceSale;
+select * from Room;
+exec BookCheapestRoom 1, 1;
+select * from RoomStay;
+select * from ServiceSale;
+exec BookCheapestRoom 6, 1; --serviceSaleId #6 will exist after this statement
+select * from RoomStay;
+select * from ServiceSale;
 go
