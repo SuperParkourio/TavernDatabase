@@ -112,9 +112,10 @@ create table ServiceSale (
 );
 
 create table GuestLinkClass (
-	guestId int foreign key references Guest(id),
-	classId int foreign key references Class(id)
+	guestId int foreign key references Guest(id) not null,
+	classId int foreign key references Class(id) not null
 );
+alter table GuestLinkClass add primary key (guestId, classId);
 
 create table GuestStatus (
 	id int identity,
